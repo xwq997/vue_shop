@@ -42,7 +42,7 @@
               <el-button type="danger" icon="el-icon-delete" size="mini" @click="removeUserById(scope.row.id)"></el-button>
               <!-- 分配角色 -->
               <el-tooltip content="分配角色" placement="top" :enterable='false'>
-                <el-button type="warning" icon="el-icon-setting" size="mini"></el-button>
+                <el-button type="warning" icon="el-icon-setting" size="mini" @click="setRole(scope.row)"></el-button>
               </el-tooltip>
            </template>
          </el-table-column>
@@ -110,6 +110,32 @@
     <el-button type="primary" @click="editUserInfo">确 定</el-button>
   </span>
 </el-dialog>
+<!-- 分配觉得的对话框 -->
+<el-dialog
+  title="分配角色"
+  :visible.sync="setRoleDialogVisible"
+  width="50%"
+  @close="setRoleDialogClosed"
+  >
+  <el-form :model="userInfo" >
+     <el-form-item label="当前的用户" label-width='90px'>
+      <el-input v-model="userInfo.username" disabled></el-input>
+    </el-form-item>
+    <el-form-item label="当前的角色" label-width='90px'>
+      <el-input v-model="userInfo.role_name" disabled></el-input>
+    </el-form-item>
+    <!-- 下拉菜单 -->
+    <el-form-item label="分配新角色" label-width='90px'>
+    <el-select v-model="selectedRoleId" placeholder="请选择新角色">
+      <el-option v-for="item in rolesList" :value="item.id"  :label="item.roleName" :key="item.id" ></el-option>
+    </el-select>
+  </el-form-item>
+  </el-form>
+  <span slot="footer" class="dialog-footer">
+    <el-button @click="setRoleDialogVisible = false">取 消</el-button>
+    <el-button type="primary" @click="saveRoleInfo">确 定</el-button>
+  </span>
+</el-dialog>
 
   </div>
 </template>
@@ -142,7 +168,8 @@ export default {
             pagesize:2  //当前每页显示多少条
         },
         userList:[], //用户列表
-        total:0, //总页数
+        total:0, //总共多少条数据
+        pageCount:0,//总共多少页
         addDialogVisible:false, //控制显示隐藏添加用户对话框
         //添加用户的表单数据
         addForm:{
@@ -183,23 +210,33 @@ export default {
             { required: true, message: "请输入手机号", trigger: "blur" },
             { validator:checkMobile,trigger:'blur'}
           ]
-        }
+        },
+        //控制分配角色对话框的显示和隐藏
+        setRoleDialogVisible:false,
+        // 当前点击分配角色的用户信息
+        userInfo:{},
+        //当前被点击分配角色的用户的当前角色
+        nowRoles:"",
+        //所有角色的数据列表
+        rolesList:[],
+        // 点击分配角色，被选中的id
+        selectedRoleId:""
     };
   },
   created(){
     this.getUserList()
 
   },
-  components: {},
-
- 
-
+  components: {
+    
+  },
+  
   methods: {
       //获取用户列表
       async getUserList(){
         const {data:res} = await this.$axios.get('users',{params:this.queryInfo})
         if(res.meta.status !== 200) return this.$message.error('获取用户列表失败');
-        console.log('获取用户列表',res)
+        // console.log('获取用户列表',res)
         this.userList=res.data.users
         this.total=res.data.total
       },
@@ -207,10 +244,12 @@ export default {
       handleSizeChange(newSize){
         this.queryInfo.pagesize=newSize
         this.getUserList()
+        console.log('每页多少条',this.queryInfo.pagesize)
       },
       //选择页数
       handleCurrentChange(newPage){
         this.queryInfo.pagenum=newPage
+        console.log('选择第几页',this.queryInfo.pagenum)
         this.getUserList()
       },
       //把改变的状态传给后台
@@ -227,7 +266,7 @@ export default {
       //关闭添加用户对话框以后清空
       addDialogClosed(){
         this.$refs.addFormRef.resetFields()
-        console.log(this.$refs)
+        // console.log(this.$refs)
       },
       //点击添加新用户的确定按钮
       addUser(){
@@ -237,7 +276,7 @@ export default {
           if(res.meta.status !==201) return this.$message.error('添加用户失败')
           this.addDialogVisible=false
           this.$message.success('添加用户成功') 
-          console.log(res)
+          // console.log(res)
           this.getUserList() //重新获取用户列表
        })
       },
@@ -247,7 +286,7 @@ export default {
         if(res.meta.status !== 200 ) return this.$message.error('查询用户信息失败')
         this.editForm = res.data
         this.editDialogVisible = true;
-        console.log(this.editForm)
+        // console.log(this.editForm)
       },
       // 修改用户对话框关闭时候里面数据还原
       editDialogClosed(){
@@ -263,7 +302,7 @@ export default {
           if(res.meta.status !==200) return this.$message.error('修改用户信息失败')
           this.editDialogVisible=false
           this.$message.success('修改用户信息成功') 
-          console.log('修改用户',res)
+          // console.log('修改用户',res)
           this.getUserList() //重新获取用户列表
        })
       },
@@ -276,11 +315,58 @@ export default {
         }).then(async() => {
           const {data:res}=await this.$axios.delete('users/'+id)
           if(res.meta.status !== 200) return this.$message.error('删除用户失败')
+          /*
+          需求：我有5条数据，每页显示2条，一共3页。
+                我删除最后一条，就只有4条了，应该马上跳到第二页。因为当前第3页已经没有自己的数据了。
+          1、先算出删除数据以后的总页数  总页数=(当前页数-删掉的1条  除以 每页显示的数量) 
+             总页数=（5-1)/2 结果是2爷。
+              假如我有4条数据，我删了一条就只有3条了，但是我每页显示2条，
+             （4-1）/2是1.5页，数据肯定要显示2页啊！所以要向上取整。
+          2、如果当前页数 > 总页数，显示总页数。不然就显示当前页数  
+          3、如果当前页数 < 1 ,就显示第一页。不然就显示当前页数
+          total 总页数  this.queryInfo.pagenum代表当前页数  this.queryInfo.pagesize代表每页显示多少
+          */
+         console.log('当前页数',this.queryInfo.pagenum)
+          const total = Math.ceil((this.total-1) / this.queryInfo.pagesize)
+          this.queryInfo.pagenum = this.queryInfo.pagenum > total ? total : this.queryInfo.pagenum
+          this.queryInfo.pagenum = this.queryInfo.pagenum  < 1 ? 1 :this.queryInfo.pagenum
+          console.log('总页数',total)
           this.$message.success('删除用户成功')
+
           this.getUserList() //重新获取用户列表
         }).catch(() => {
           this.$message.info('取消删除')       
         });
+      },
+      //点击分配角色按钮
+      async setRole(row){
+        //当前被点击的用户。
+        this.userInfo=row
+        //
+        this.nowRoles=row.role_name
+        this.selectedRoleId=this.nowRoles
+        console.log('我被点击了',row)
+        //获取所有的角色列表
+        const {data:res} = await this.$axios.get('roles')
+        if(res.meta.status!==200) return this.$message.error('获取角色列表失败')
+        this.rolesList=res.data
+        console.log('所有角色',this.rolesList)
+        this.setRoleDialogVisible=true
+      },
+      // 点击分配角色的确认按钮
+      async saveRoleInfo(){
+        if(!this.selectedRoleId) return this.$message.error('请选择要分配的角色')
+        const {data:res} = await this.$axios.put('users/'+this.userInfo.id+'/role',{rid:this.selectedRoleId})
+        if(res.meta.status!==200) return this.$message.error('分配角色失败')
+        this.$message.success('分配角色成功')
+        console.log('分配角色成功',res)
+        this.getUserList()
+        this.setRoleDialogVisible=false
+      },
+      // 清空分配角色下拉框
+      setRoleDialogClosed(){
+        this.selectedRoleId=""
+        this.userInfo={}
       }
   },
 };
@@ -292,5 +378,8 @@ export default {
 }
 .el-pagination{
   margin-top: 15px;
+}
+/deep/.el-select{
+  width: 100%;
 }
 </style>

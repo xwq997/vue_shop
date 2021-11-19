@@ -48,7 +48,7 @@
             >
               <template slot="title">
                 <i class="el-icon-menu"></i>
-                <span>用户列表</span>
+                <span>{{subItem.authName}}</span>
               </template>
             </el-menu-item>
           </el-submenu>
@@ -66,7 +66,7 @@
 export default {
   data() {
     return {
-      menuList: [],
+      menuList: [], //左侧菜单栏
       iconList: [
         "iconfont icon-user",
         "iconfont icon-tijikongjian",
@@ -95,7 +95,7 @@ export default {
     //获取左侧菜单
     async getMenuList() {
       const { data: res } = await this.$axios.get("menus");
-      // console.log(res)
+      // console.log('获取左侧菜单',res)
       if (res.meta.status !== 200) return this.$message.error(res.meta.msg);
       this.menuList = res.data;
       //获取图标
