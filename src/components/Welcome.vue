@@ -1,6 +1,6 @@
 <!--  -->
 <template>
-  <div>Welcome</div>
+  <div>秋秋糖又来写代码拉</div>
 </template>
 
 <script>

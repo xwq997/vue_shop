@@ -69,26 +69,25 @@ export default {
   },
 
   components: {},
-  methods:{
+  methods: {
     //重置按钮
-    resetLoginForm(){
-      this.$refs.loginFormRef.resetFields()
-      
+    resetLoginForm() {
+      this.$refs.loginFormRef.resetFields();
     },
     // 登陆按钮
-    login(){
-      this.$refs.loginFormRef.validate((async valid=>{
-        if(!valid) return;
-        const {data:res}=await this.$axios.post('login',this.loginForm); 
-        console.log(res)
-        if(res.meta.status!==200) return this.$message.error('登陆失败');
-        this.$message.success('登陆成功')
+    login() {
+      this.$refs.loginFormRef.validate(async (valid) => {
+        if (!valid) return;
+        const { data: res } = await this.$axios.post("login", this.loginForm);
+        console.log(res);
+        if (res.meta.status !== 200) return this.$message.error("登陆失败");
+        this.$message.success("登陆成功");
         //保存token到session里面
-        window.sessionStorage.setItem('token',res.data.token);
-        this.$router.push('/home');
-      }))
-    }
-  }
+        window.sessionStorage.setItem("token", res.data.token);
+        this.$router.push("/home");
+      });
+    },
+  },
 };
 </script>
 <style lang="less" scoped>
