@@ -254,8 +254,8 @@ export default {
     // 查看物流
      showProgress(id){
         this.ProgressVisible=true
-        
     }
+    // 随便修改
   },
 };
 </script>
